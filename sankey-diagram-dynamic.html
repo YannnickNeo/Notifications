@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagramme Sankey - Flux de Notifications</title>
+    <style>
+        :root {
+            --b2b-color: #3498db;
+            --event-color: #e67e22;
+            --notification-color: #2ecc71;
+            --allocation-color: #9b59b6;
+            --affilie-color: #e74c3c;
+            --assure-color: #f1c40f;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f9f9f9;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow: hidden;
+        }
+        
+        header {
+            margin-bottom: 15px;
+        }
+        
+        h1 {
+            font-size: 22px;
+            color: #2c3e50;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+        
+        .subtitle {
+            font-size: 14px;
+            color: #7f8c8d;
+            text-align: center;
+            margin-bottom: 5px;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            background-color: #ecf0f1;
+            border-radius: 20px;
+            overflow: hidden;
+        }
+        
+        .control-btn {
+            padding: 6px 12px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s ease;
+        }
+        
+        .control-btn.active {
+            background-color: #2c3e50;
+            color: white;
+        }
+        
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+        }
+        
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+        
+        .search-box {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+        
+        .search-input {
+            width: 300px;
+            padding: 6px 12px;
+            border: 1px solid #dfe6e9;
+            border-radius: 20px;
+            font-size: 13px;
+            outline: none;
+        }
+        
+        .sankey-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .node rect {
+            cursor: pointer;
+            fill-opacity: 0.8;
+            stroke: #000;
+            stroke-width: 1px;
+        }
+        
+        .node text {
+            pointer-events: none;
+            font-size: 12px;
+        }
+        
+        .link {
+            fill: none;
+            stroke-opacity: 0.3;
+            transition: stroke-opacity 0.3s;
+        }
+        
+        .link:hover {
+            stroke-opacity: 0.6;
+        }
+        
+        .node.highlight rect {
+            stroke-width: 2px;
+            stroke: #f39c12;
+        }
+        
+        .link.highlight {
+            stroke-opacity: 0.8;
+            stroke-width: 2px;
+        }
+        
+        .tooltip {
+            position: absolute;
+            padding: 8px 12px;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            border-radius: 5px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 100;
+            max-width: 300px;
+            white-space: normal;
+        }
+        
+        .source-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 10px;
+            color: white;
+            margin-left: 5px;
+        }
+        
+        .allocation { background-color: var(--allocation-color); }
+        .affilie { background-color: var(--affilie-color); }
+        .assure { background-color: var(--assure-color); }
+        
+        .tab-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+        
+        .tab {
+            padding: 6px 12px;
+            background-color: #ecf0f1;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s ease;
+        }
+        
+        .tab:first-child {
+            border-top-left-radius: 20px;
+            border-bottom-left-radius: 20px;
+        }
+        
+        .tab:last-child {
+            border-top-right-radius: 20px;
+            border-bottom-right-radius: 20px;
+        }
+        
+        .tab.active {
+            background-color: #2c3e50;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Diagramme Sankey des Flux de Notifications</h1>
+            <div class="subtitle">Visualisation des liens entre les différentes notifications avec identification des sources</div>
+        </header>
+        
+        <div class="tab-container">
+            <button class="tab active" data-section="all">Tous</button>
+            <button class="tab" data-section="allocations">Allocations Familiales</button>
+            <button class="tab" data-section="affilie">Affilié</button>
+            <button class="tab" data-section="assure">Assuré</button>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: var(--b2b-color);"></div>
+                <span>Notification du portail B2B</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: var(--event-color);"></div>
+                <span>Événement transverse</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: var(--notification-color);"></div>
+                <span>Notification 1st</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: var(--allocation-color);"></div>
+                <span>Allocations Familiales</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: var(--affilie-color);"></div>
+                <span>Affilié</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: var(--assure-color);"></div>
+                <span>Assuré</span>
+            </div>
+        </div>
+        
+        <div class="search-box">
+            <input type="text" class="search-input" placeholder="Rechercher une notification...">
+        </div>
+        
+        <div class="sankey-container">
+            <div class="tooltip"></div>
+            <svg id="sankey"></svg>
+        </div>
+    </div>
+    
+    <script>
+        // Data structure for Sankey diagram
+        const allData = {
+            nodes: [
+                // B2B Portal Notifications (source)
+                {id: "b2b-1", name: "Entrée d'un collaborateur", group: 0, section: "allocations"},
+                {id: "b2b-2", name: "Mise à jour des informations personnelles", group: 0, section: "allocations"},
+                {id: "b2b-3", name: "Déménagement", group: 0, section: "allocations"},
+                {id: "b2b-4", name: "Absence d'un collaborateur", group: 0, section: "allocations"},
+                {id: "b2b-5", name: "Entrée du personnel", group: 0, section: "allocations"},
+                {id: "b2b-6", name: "Sortie d'un collaborateur", group: 0, section: "allocations"},
+                {id: "b2b-7", name: "Décès d'un collaborateur", group: 0, section: "allocations"},
+                {id: "b2b-8", name: "Enfants et allocations familiales", group: 0, section: "allocations"},
+                {id: "b2b-9", name: "Formation d'un enfant", group: 0, section: "allocations"},
+                {id: "b2b-10", name: "Nouvel enfant et allocations familiales", group: 0, section: "allocations"},
+                {id: "b2b-11", name: "Saisie des masses salariales réelles", group: 0, section: "affilie"},
+                {id: "b2b-12", name: "Déménagement (Affilié)", group: 0, section: "affilie"},
+                {id: "b2b-13", name: "Mise à jour de l'adresse de paiement de l'entreprise", group: 0, section: "affilie"},
+                {id: "b2b-14", name: "Départ du personnel", group: 0, section: "assure"},
+                {id: "b2b-15", name: "Mise à jour des données personnelles", group: 0, section: "assure"},
+                {id: "b2b-16", name: "Déménagement (Assuré)", group: 0, section: "assure"},
+                {id: "b2b-17", name: "Annonce de décès", group: 0, section: "assure"},
+                {id: "b2b-18", name: "Entrée du personnel (Assuré)", group: 0, section: "assure"},
+                {id: "b2b-19", name: "Édition du certificat d'assurance", group: 0, section: "assure"},
+                {id: "b2b-20", name: "Absence d'un collaborateur (Assuré)", group: 0, section: "assure"},
+                {id: "b2b-21", name: "Annonce d'absence", group: 0, section: "assure"},
+                {id: "b2b-22", name: "Entrée de plusieurs collaborateurs", group: 0, section: "assure"},
+                {id: "b2b-23", name: "Demande d'information", group: 0, section: "assure"},
+                
+                // Cross-cutting events (middle)
+                {id: "event-1", name: "Nouveau collaborateur (B2B + IM)", group: 1, section: "allocations"},
+                {id: "event-2", name: "Modification des données partenaire (B2B + IM)", group: 1, section: "allocations"},
+                {id: "event-3", name: "Changement d'adresse", group: 1, section: "allocations"},
+                {id: "event-4", name: "Absence de collaborateur (Congé non payé)", group: 1, section: "allocations"},
+                {id: "event-5", name: "Nouveau collaborateur", group: 1, section: "allocations"},
+                {id: "event-6", name: "Fin de rapport de travail", group: 1, section: "allocations"},
+                {id: "event-7", name: "Décès d'un assuré", group: 1, section: "allocations"},
+                {id: "event-8", name: "N/A (Allocations)", group: 1, section: "allocations"},
+                {id: "event-9", name: "Masses salariales réelles", group: 1, section: "affilie"},
+                {id: "event-10", name: "Changement d'adresse de paiement", group: 1, section: "affilie"},
+                {id: "event-11", name: "N/A (Assuré)", group: 1, section: "assure"},
+                {id: "event-12", name: "Modification des données partenaire", group: 1, section: "assure"},
+                {id: "event-13", name: "Changement d'adresse (Assuré)", group: 1, section: "assure"},
+                {id: "event-14", name: "Congé non payé", group: 1, section: "assure"},
+                {id: "event-15", name: "Annonce de maladie ou accident", group: 1, section: "assure"},
+                {id: "event-16", name: "Demande d'information (Assuré)", group: 1, section: "assure"},
+                
+                // First notifications (target)
+                {id: "notif-1", name: "Modification d'allocations familiales", group: 2, section: "allocations"},
+                {id: "notif-2", name: "Nouveau collaborateur (Allocation)", group: 2, section: "allocations"},
+                {id: "notif-3", name: "Fin de rapport de travail (Allocation)", group: 2, section: "allocations"},
+                {id: "notif-4", name: "Décès (Allocation)", group: 2, section: "allocations"},
+                {id: "notif-5", name: "Demande d'allocations familiales", group: 2, section: "allocations"},
+                {id: "notif-6", name: "Annonce de formation / prolongation d'étude", group: 2, section: "allocations"},
+                {id: "notif-7", name: "Décompte ADI", group: 2, section: "allocations"},
+                {id: "notif-8", name: "Opposition", group: 2, section: "allocations"},
+                {id: "notif-9", name: "Attestation fiscale de prestations", group: 2, section: "allocations"},
+                {id: "notif-10", name: "Annonce du RAFam", group: 2, section: "allocations"},
+                {id: "notif-11", name: "N/A (Affilié)", group: 2, section: "affilie"},
+                {id: "notif-12", name: "Modification des données administratives de l'affilié", group: 2, section: "affilie"},
+                {id: "notif-13", name: "Assistant pour une demande de modification d'une affiliation", group: 2, section: "affilie"},
+                {id: "notif-14", name: "Fin de rapport de travail (Assuré)", group: 2, section: "assure"},
+                {id: "notif-15", name: "N/A (Assuré Notif)", group: 2, section: "assure"},
+                {id: "notif-16", name: "Décès (Assuré)", group: 2, section: "assure"},
+                {id: "notif-17", name: "Création d'un Assuré", group: 2, section: "assure"},
+                {id: "notif-18", name: "Perte de carte AVS", group: 2, section: "assure"},
+                {id: "notif-19", name: "Worker", group: 2, section: "assure"},
+                {id: "notif-20", name: "Nouveaux collaborateurs", group: 2, section: "assure"},
+                {id: "notif-21", name: "Demande d'information (Assuré Notif)", group: 2, section: "assure"}
+            ],
+            links: [
+                // Allocations Familiales links
+                {source: "b2b-1", target: "event-1", value: 2, section: "allocations"},
+                {source: "event-1", target: "notif-1", value: 2, section: "allocations"},
+                {source: "b2b-2", target: "event-2", value: 2, section: "allocations"},
+                {source: "event-2", target: "notif-1", value: 2, section: "allocations"},
+                {source: "b2b-3", target: "event-3", value: 2, section: "allocations"},
+                {source: "event-3", target: "notif-1", value: 2, section: "allocations"},
+                {source: "b2b-4", target: "event-4", value: 2, section: "allocations"},
+                {source: "event-4", target: "notif-1", value: 2, section: "allocations"},
+                {source: "b2b-5", target: "event-5", value: 2, section: "allocations"},
+                {source: "event-5", target: "notif-2", value: 2, section: "allocations"},
+                {source: "b2b-6", target: "event-6", value: 2, section: "allocations"},
+                {source: "event-6", target: "notif-3", value: 2, section: "allocations"},
+                {source: "b2b-7", target: "event-7", value: 2, section: "allocations"},
+                {source: "event-7", target: "notif-4", value: 2, section: "allocations"},
+                {source: "b2b-8", target: "event-8", value: 2, section: "allocations"},
+                {source: "event-8", target: "notif-5", value: 1, section: "allocations"},
+                {source: "b2b-9", target: "event-8", value: 2, section: "allocations"},
+                {source: "event-8", target: "notif-6", value: 1, section: "allocations"},
+                {source: "b2b-10", target: "event-8", value: 2, section: "allocations"},
+                {source: "event-8", target: "notif-1", value: 1, section: "allocations"},
+                {source: "event-8", target: "notif-7", value: 1, section: "allocations"},
+                {source: "event-8", target: "notif-8", value: 1, section: "allocations"},
+                {source: "event-8", target: "notif-9", value: 1, section: "allocations"},
+                {source: "event-8", target: "notif-10", value: 1, section: "allocations"},
+                
+                // Affilié links
+                {source: "b2b-11", target: "event-9", value: 2, section: "affilie"},
+                {source: "event-9", target: "notif-11", value: 2, section: "affilie"},
+                {source: "b2b-12", target: "event-10", value: 2, section: "affilie"},
+                {source: "event-10", target: "notif-12", value: 1, section: "affilie"},
+                {source: "b2b-13", target: "event-10", value: 2, section: "affilie"},
+                {source: "event-10", target: "notif-13", value: 1, section: "affilie"},
+                
+                // Assuré links
+                {source: "b2b-14", target: "event-11", value: 2, section: "assure"},
+                {source: "event-11", target: "notif-14", value: 1, section: "assure"},
+                {source: "b2b-15", target: "event-12", value: 2, section: "assure"},
+                {source: "event-12", target: "notif-15", value: 2, section: "assure"},
+                {source: "b2b-16", target: "event-13", value: 2, section: "assure"},
+                {source: "event-13", target: "notif-15", value: 2, section: "assure"},
+                {source: "b2b-17", target: "event-11", value: 2, section: "assure"},
+                {source: "event-11", target: "notif-16", value: 1, section: "assure"},
+                {source: "b2b-18", target: "event-11", value: 2, section: "assure"},
+                {source: "event-11", target: "notif-17", value: 1, section: "assure"},
+                {source: "b2b-19", target: "event-11", value: 2, section: "assure"},
+                {source: "event-11", target: "notif-18", value: 1, section: "assure"},
+                {source: "b2b-20", target: "event-11", value: 2, section: "assure"},
+                {source: "event-11", target: "notif-19", value: 1, section: "assure"},
+                {source: "b2b-21", target: "event-14", value: 2, section: "assure"},
+                {source: "event-14", target: "notif-15", value: 2, section: "assure"},
+                {source: "b2b-20", target: "event-15", value: 2, section: "assure"},
+                {source: "event-15", target: "notif-15", value: 2, section: "assure"},
+                {source: "b2b-22", target: "event-11", value: 2, section: "assure"},
+                {source: "event-11", target: "notif-20", value: 1, section: "assure"},
+                {source: "b2b-23", target: "event-16", value: 2, section: "assure"},
+                {source: "event-16", target: "notif-21", value: 2, section: "assure"}
+            ]
+        };
+        
+        // Current view state
+        let currentData = JSON.parse(JSON.stringify(allData));
+        let currentSection = 'all';
+        let searchTerm = '';
+        
+        // Colors for nodes by group
+        const nodeColors = ['#3498db', '#e67e22', '#2ecc71'];
+        
+        // Colors for nodes by section
+        const sectionColors = {
+            allocations: '#9b59b6', // Purple
+            affilie: '#e74c3c',     // Red
+            assure: '#f1c40f'       // Yellow
+        };
+        
+        // SVG and dimensions
+        const svg = document.getElementById('sankey');
+        let width = svg.clientWidth;
+        let height = svg.clientHeight;
+        
+        // Sankey chart properties
+        const nodeWidth = 20;
+        const nodePadding = 10;
+        
+        // Initialize the diagram
+        function initDiagram() {
+            updateData();
+            renderSankey();
+            
+            // Add event listeners
+            window.addEventListener('resize', () => {
+                width = svg.clientWidth;
+                height = svg.clientHeight;
+                renderSankey();
+            });
+            
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    currentSection = tab.getAttribute('data-section');
+                    updateData();
+                    renderSankey();
+                });
+            });
+            
+            document.querySelector('.search-input').addEventListener('input', (e) => {
+                searchTerm = e.target.value.toLowerCase();
+                updateData();
+                renderSankey();
+            });
+        }
+        
+        // Update data based on current filters
+        function updateData() {
+            if (currentSection === 'all' && !searchTerm) {
+                currentData = JSON.parse(JSON.stringify(allData));
+                return;
+            }
+            
+            // Filter nodes
+            let filteredNodes = allData.nodes.filter(node => {
+                const matchesSection = currentSection === 'all' || node.section === currentSection;
+                const matchesSearch = !searchTerm || node.name.toLowerCase().includes(searchTerm);
+                return matchesSection && matchesSearch;
+            });
+            
+            // Get node IDs that passed the filter
+            const nodeIds = new Set(filteredNodes.map(node => node.id));
+            
+            // Filter links that connect filtered nodes
+            let filteredLinks = allData.links.filter(link => {
+                const sourceExists = nodeIds.has(link.source) || nodeIds.has(link.source.id);
+                const targetExists = nodeIds.has(link.target) || nodeIds.has(link.target.id);
+                const matchesSection = currentSection === 'all' || link.section === currentSection;
+                return sourceExists && targetExists && matchesSection;
+            });
+            
+            // If searching, we need to include nodes that might not match the search
+            // but are connected to nodes that do match the search
+            if (searchTerm) {
+                const connectedNodeIds = new Set();
+                
+                filteredLinks.forEach(link => {
+                    const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                    const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                    connectedNodeIds.add(sourceId);
+                    connectedNodeIds.add(targetId);
+                });
+                
+                // Add connected nodes that weren't included initially
+                const additionalNodes = allData.nodes.filter(node => {
+                    return connectedNodeIds.has(node.id) && !nodeIds.has(node.id);
+                });
+                
+                filteredNodes = [...filteredNodes, ...additionalNodes];
+            }
+            
+            currentData = {
+                nodes: filteredNodes,
+                links: filteredLinks
+            };
+        }
+        
+        // Simple Sankey diagram implementation
+        function renderSankey() {
+            // Clear SVG
+            svg.innerHTML = '';
+            
+            // Process the data
+            const nodes = currentData.nodes.map(d => ({...d}));
+            const links = currentData.links.map(d => ({...d}));
+            
+            // Map string IDs to node references
+            const nodeMap = {};
+            nodes.forEach((node, i) => {
+                nodeMap[node.id] = node;
+                node.sourceLinks = [];
+                node.targetLinks = [];
+            });
+            
+            links.forEach((link, i) => {
+                const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+                const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+                
+                link.source = nodeMap[sourceId];
+                link.target = nodeMap[targetId];
+                
+                link.source.sourceLinks.push(link);
+                link.target.targetLinks.push(link);
+            });
+            
+            // Group nodes by their group (column)
+            const nodesByGroup = {};
+            nodes.forEach(node => {
+                if (!nodesByGroup[node.group]) {
+                    nodesByGroup[node.group] = [];
+                }
+                nodesByGroup[node.group].push(node);
+            });
+            
+            // Position nodes
+            const groupCount = Object.keys(nodesByGroup).length;
+            const groupWidth = width / groupCount;
+            
+            Object.keys(nodesByGroup).forEach(group => {
+                const groupNodes = nodesByGroup[group];
+                const groupX = parseInt(group) * groupWidth + groupWidth / 2 - nodeWidth / 2;
+                const nodeHeight = (height - 50) / groupNodes.length;
+                
+                groupNodes.forEach((node, i) => {
+                    node.x0 = groupX;
+                    node.x1 = groupX + nodeWidth;
+                    node.y0 = i * nodeHeight + 25;
+                    node.y1 = (i + 1) * nodeHeight - nodePadding + 25;
+                    
+                    // Calculate node value (total flows)
+                    node.value = Math.max(
+                        d3sum(node.sourceLinks, d => d.value),
+                        d3sum(node.targetLinks, d => d.value)
+                    );
+                });
+            });
+            
+            // Draw nodes
+            const nodeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            nodeGroup.setAttribute('class', 'nodes');
+            
+            nodes.forEach(node => {
+                const nodeElement = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                nodeElement.setAttribute('class', 'node');
+                nodeElement.setAttribute('data-id', node.id);
+                
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', node.x0);
+                rect.setAttribute('y', node.y0);
+                rect.setAttribute('width', node.x1 - node.x0);
+                rect.setAttribute('height', node.y1 - node.y0);
+                rect.setAttribute('fill', nodeColors[node.group]);
+                
+                const sectionColor = sectionColors[node.section];
+                rect.setAttribute('stroke', sectionColor);
+                rect.setAttribute('stroke-width', '2');
+                
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', node.x0 < width / 2 ? node.x1 + 6 : node.x0 - 6);
+                text.setAttribute('y', (node.y0 + node.y1) / 2);
+                text.setAttribute('dy', '0.35em');
+                text.setAttribute('text-anchor', node.x0 < width / 2 ? 'start' : 'end');
+                text.textContent = node.name;
+                
+                nodeElement.appendChild(rect);
+                nodeElement.appendChild(text);
+                nodeGroup.appendChild(nodeElement);
+                
+                // Add event listeners for node hover
+                nodeElement.addEventListener('mouseenter', () => {
+                    highlightNode(node);
+                    showTooltip(node);
+                });
+                
+                nodeElement.addEventListener('mouseleave', () => {
+                    resetHighlighting();
+                    hideTooltip();
+                });
+                
+                nodeElement.addEventListener('mousemove', (e) => {
+                    moveTooltip(e);
+                });
+            });
+            
+            svg.appendChild(nodeGroup);
+            
+            // Draw links
+            const linkGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            linkGroup.setAttribute('class', 'links');
+            
+            links.forEach(link => {
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('class', 'link');
+                path.setAttribute('d', sankeyLinkPath(link));
+                path.setAttribute('stroke', sectionColors[link.section]);
+                path.setAttribute('stroke-width', Math.max(1, link.value));
+                
+                path.setAttribute('data-source', link.source.id);
+                path.setAttribute('data-target', link.target.id);
+                
+                // Add event listeners for link hover
+                path.addEventListener('mouseenter', () => {
+                    highlightLink(link);
+                    showLinkTooltip(link);
+                });
+                
+                path.addEventListener('mouseleave', () => {
+                    resetHighlighting();
+                    hideTooltip();
+                });
+                
+                path.addEventListener('mousemove', (e) => {
+                    moveTooltip(e);
+                });
+                
+                linkGroup.appendChild(path);
+            });
+            
+            svg.appendChild(linkGroup);
+        }
+        
+        // Generate path for Sankey link
+        function sankeyLinkPath(link) {
+            const curvature = 0.5;
+            
+            let x0 = link.source.x1;
+            let x1 = link.target.x0;
+            let y0 = link.source.y0 + (link.source.y1 - link.source.y0) / 2;
+            let y1 = link.target.y0 + (link.target.y1 - link.target.y0) / 2;
+            
+            const xi = d3interpolateNumber(x0, x1);
+            const x2 = xi(curvature);
+            const x3 = xi(1 - curvature);
+            
+            return `M${x0},${y0}C${x2},${y0} ${x3},${y1} ${x1},${y1}`;
+        }
+        
+        // Highlight a node and its connections
+        function highlightNode(node) {
+            document.querySelectorAll('.node').forEach(el => {
+                el.classList.remove('highlight');
+            });
+            
+            document.querySelectorAll('.link').forEach(el => {
+                el.classList.remove('highlight');
+                el.style.opacity = 0.1;
+            });
+            
+            // Highlight the node
+            const nodeElement = document.querySelector(`.node[data-id="${node.id}"]`);
+            if (nodeElement) {
+                nodeElement.classList.add('highlight');
+            }
+            
+            // Highlight incoming links
+            node.targetLinks.forEach(link => {
+                const linkElement = document.querySelector(`.link[data-source="${link.source.id}"][data-target="${link.target.id}"]`);
+                if (linkElement) {
+                    linkElement.classList.add('highlight');
+                    linkElement.style.opacity = 1;
+                }
+                
+                // Highlight source node
+                const sourceElement = document.querySelector(`.node[data-id="${link.source.id}"]`);
+                if (sourceElement) {
+                    sourceElement.classList.add('highlight');
+                }
+            });
+            
+            // Highlight outgoing links
+            node.sourceLinks.forEach(link => {
+                const linkElement = document.querySelector(`.link[data-source="${link.source.id}"][data-target="${link.target.id}"]`);
+                if (linkElement) {
+                    linkElement.classList.add('highlight');
+                    linkElement.style.opacity = 1;
+                }
+                
+                // Highlight target node
+                const targetElement = document.querySelector(`.node[data-id="${link.target.id}"]`);
+                if (targetElement) {
+                    targetElement.classList.add('highlight');
+                }
+            });
+        }
+        
+        // Highlight a link and its nodes
+        function highlightLink(link) {
+            document.querySelectorAll('.node').forEach(el => {
+                el.classList.remove('highlight');
+            });
+            
+            document.querySelectorAll('.link').forEach(el => {
+                el.classList.remove('highlight');
+                el.style.opacity = 0.1;
+            });
+            
+            // Highlight the link
+            const linkElement = document.querySelector(`.link[data-source="${link.source.id}"][data-target="${link.target.id}"]`);
+            if (linkElement) {
+                linkElement.classList.add('highlight');
+                linkElement.style.opacity = 1;
+            }
+            
+            // Highlight source and target nodes
+            const sourceElement = document.querySelector(`.node[data-id="${link.source.id}"]`);
+            const targetElement = document.querySelector(`.node[data-id="${link.target.id}"]`);
+            
+            if (sourceElement) sourceElement.classList.add('highlight');
+            if (targetElement) targetElement.classList.add('highlight');
+        }
+        
+        // Reset all highlighting
+        function resetHighlighting() {
+            document.querySelectorAll('.node').forEach(el => {
+                el.classList.remove('highlight');
+            });
+            
+            document.querySelectorAll('.link').forEach(el => {
+                el.classList.remove('highlight');
+                el.style.opacity = '';
+            });
+        }
+        
+        // Show tooltip for a node
+        function showTooltip(node) {
+            const tooltip = document.querySelector('.tooltip');
+            
+            // Count incoming and outgoing links
+            const incomingCount = node.targetLinks.length;
+            const outgoingCount = node.sourceLinks.length;
+            
+            let html = `<strong>${node.name}</strong><br>`;
+            html += `<span class="source-badge ${node.section}">${node.section}</span><br>`;
+            html += `Connexions entrantes: ${incomingCount}<br>`;
+            html += `Connexions sortantes: ${outgoingCount}<br>`;
+            
+            tooltip.innerHTML = html;
+            tooltip.style.opacity = 1;
+        }
+        
+        // Show tooltip for a link
+        function showLinkTooltip(link) {
+            const tooltip = document.querySelector('.tooltip');
+            
+            let html = `<strong>Connexion</strong><br>`;
+            html += `<span class="source-badge ${link.section}">${link.section}</span><br>`;
+            html += `De: ${link.source.name}<br>`;
+            html += `À: ${link.target.name}<br>`;
+            html += `Poids: ${link.value}`;
+            
+            tooltip.innerHTML = html;
+            tooltip.style.opacity = 1;
+        }
+        
+        // Hide tooltip
+        function hideTooltip() {
+            const tooltip = document.querySelector('.tooltip');
+            tooltip.style.opacity = 0;
+        }
+        
+        // Move tooltip with mouse
+        function moveTooltip(event) {
+            const tooltip = document.querySelector('.tooltip');
+            const tooltipWidth = tooltip.offsetWidth;
+            const tooltipHeight = tooltip.offsetHeight;
+            
+            const x = event.clientX + 10;
+            const y = event.clientY + 10;
+            
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            
+            // Adjust position if tooltip would go off screen
+            const adjustedX = x + tooltipWidth > windowWidth ? x - tooltipWidth - 20 : x;
+            const adjustedY = y + tooltipHeight > windowHeight ? y - tooltipHeight - 20 : y;
+            
+            tooltip.style.left = `${adjustedX}px`;
+            tooltip.style.top = `${adjustedY}px`;
+        }
+        
+        // Helper functions similar to D3.js
+        function d3sum(array, accessor) {
+            return array.reduce((sum, item) => sum + accessor(item), 0);
+        }
+        
+        function d3interpolateNumber(a, b) {
+            return function(t) {
+                return a * (1 - t) + b * t;
+            };
+        }
+        
+        // Initialize diagram when page loads
+        document.addEventListener('DOMContentLoaded', initDiagram);
+    </script>
+</body>
+</html>
